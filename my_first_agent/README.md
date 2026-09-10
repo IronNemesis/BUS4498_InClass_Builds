@@ -7,16 +7,16 @@
 
 ### System Designer Name
 
-[Enter your name.]
+Aidan Jones
 
 
 ### System Name
 
-[Use a default name "HackTrack" or enter the name you choose for the system.]
+RSVP Sentinel
 
 ### System Goal
-[Read Chapter 2 Section 2.1, then enter the well-structured goal of your agentic system]
+The goal is to help CPVC organizers more accurately predict actual Hackathon attendance for resource planning (food, drinks, etc), improving prediction accuracy from the current 40% baseline to at least 80%, without collecting extra personal data or over-communicating with participants.
 
 ### Who Is Better Off When This Works?
 
-[In one complete sentence, identify who will be better off when the system works.]
+Both the CPVC organizers and student participants benefit from the improved organization of club related events; participants are more certain to get free resources and organizers can more accurately predict how many resources are needed.
