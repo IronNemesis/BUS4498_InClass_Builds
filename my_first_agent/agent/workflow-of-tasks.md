@@ -24,31 +24,21 @@ One exception path may result from unusually low confirmation response rates, in
 
 ```mermaid
 flowchart TD
-    T1[T1: Retrieve current registration data]
-    T2[T2: Send one-click confirmation email/text]
-    T3[T3: Combine confirmations with historical attendance rate]
-    T4{T4: Confirmation response rate sufficient?}
-    T5[T5: Fall back to historical base rate]
-    T6[T6: Compute predicted attendance with confidence range]
-    T7[T7: Draft forecast and food/drinks report]
-    T8[T8: Organizer review]
-    T9{T9: Organizer overrides forecast?}
-    T10[T10: Log override reason]
-    T11[T11: Send final report / finalize purchases]
-    T12[T12: Log actual attendance post-event]
-
-    T1 --> T2
-    T2 --> T3
-    T3 --> T4
-    T4 -- low --> T5
-    T5 --> T6
-    T4 -- sufficient --> T6
-    T6 --> T7
-    T7 --> T8
-    T8 --> T9
-    T9 -- yes --> T10
-    T10 --> T11
-    T9 -- no --> T11
-    T11 --> T12
-    T12 -.-> T1
+    Trigger(["Trigger: 24h After Registration Opens / Every 48h / Manual Trigger"]) --> T1["Retrieve Current Registration Data"]
+    T1 --> T2["Send One-Click Confirmation Email/Text to RSVPed Participants"]
+    T2 --> D1{"Confirmation Response Rate Normal?"}
+    D1 -->|"Yes: Normal Response Rate"| T3["Combine Confirmation Data with Historical Attendance Rate"]
+    D1 -->|"No: Unusually Low Response Rate"| T4["Fall Back to Historical Base Rate"]
+    T4 --> T3
+    T3 --> T5["Compute Predicted Attendance and Confidence Range"]
+    T5 --> T6["Generate Recommended Food and Drink Quantities"]
+    T6 --> T7["Package Forecast and Recommendations into Report"]
+    T7 --> T8["Send Report to Organizers for Review"]
+    T8 --> D2{"Organizer Reviews Forecast"}
+    D2 -->|"Approve Forecast As-Is"| T9["Finalize Forecast and Purchase Recommendations"]
+    D2 -->|"Override Forecast Numbers"| T10["Log Organizer Override"]
+    T10 --> T9
+    T9 --> End1(["Completion: Forecast and Purchase Suggestions Delivered"])
+    End1 -.-> T11["Log Actual Day-Of Attendance"]
+    T11 -.-> End2(["Optional: Forecast Accuracy Evaluated"])
 ```
