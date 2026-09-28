@@ -14,7 +14,7 @@ Aidan Jones
 RSVP Sentinel
 
 ### System Goal
-The goal is to help CPVC organizers more accurately predict actual Hackathon attendance for resource planning (food, drinks, etc), improving prediction accuracy from the current 40% baseline to at least 80%, without collecting extra personal data or over-communicating with participants.
+**For** CPVC organizers planning the campus-wide AI Hackathon, **improve** how accurately they predict actual attendance when buying food, drinks, and event swag, **measured by** forecast accuracy (the smaller of forecast and actual day-of attendance divided by the larger) **moving from** a baseline of about 40% (planning from raw registration totals, when only ~40% of registrants attended CPVC's last build event) **to** a target of at least 80%, **without** collecting personal data beyond existing RSVP information, sending participants more than the one-click confirmation request, or finalizing purchases without organizer review.
 
 ### Who Is Better Off When This Works?
 
