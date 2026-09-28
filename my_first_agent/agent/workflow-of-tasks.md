@@ -14,9 +14,9 @@ The workflow is completed once the agent has produced a predicted attendance out
 
 ### 1.4 General Workflow
 
-For the normal path, the system performs **T1: Retrieve Current Registration Data** (from survey RSVPs) and **T2: Send One-Click Confirmation Email/Text to RSVPed Participants**, which records the responses it collects. **T3: Combine Confirmation Data with Historical Attendance Rate** blends the confirmation data with historical attendance-rate data (like the ~40% baseline from the last build event). **T5: Compute Predicted Attendance and Confidence Range** turns that blend into a predicted attendance number with a confidence range, and **T6: Generate Recommended Food and Drink Quantities** converts the forecast into purchase quantities. **T7: Package Forecast and Recommendations into Report** and **T8: Send Report to Organizers for Review** deliver a short report to organizers.
+For the normal path, the system performs **T1: Retrieve Current Registration Data**, which retrieves survey RSVPs and event context (event date, event type, and known scheduling conflicts), and **T2: Send One-Click Confirmation Email/Text to RSVPed Participants**, which records the responses it collects. Each registrant receives the confirmation request at most once; later runs send it only to new registrants and continue recording responses. **T3: Combine Confirmation Data with Historical Attendance Rate** blends the confirmation data with historical attendance-rate data (like the ~40% baseline from the last build event). **T5: Compute Predicted Attendance and Confidence Range** turns that blend into a predicted attendance number with a confidence range, and **T6: Generate Recommended Food and Drink Quantities** converts the forecast into purchase quantities. **T7: Package Forecast and Recommendations into Report** and **T8: Send Report to Organizers for Review** deliver a short report to organizers.
 
-One exception path results from unusually low confirmation response rates, in which case the system performs **T4: Fall Back to Historical Base Rate** before T3. If T1 cannot retrieve the registration data, the run stops and the CPVC Event Planner is asked to resolve the data issue; no forecast is produced from missing data. If T3 cannot determine a justified weighting within its limits, it hands the case to the CPVC Event Planner, who sets the weighting before T5 continues.
+One exception path results from unusually low confirmation response rates, in which case the system performs **T4: Apply Historical Base Rate** before T3. If T1 cannot retrieve the registration data, the run stops and the CPVC Event Planner is asked to resolve the data issue; no forecast is produced from missing data. If T3 cannot determine a justified weighting within its limits, it hands the case to the CPVC Event Planner, who sets the weighting before T5 continues.
 
 There is a human-review checkpoint before the final forecast is sent, where organizers can approve the forecast or manually adjust the numbers based on their own judgment before **T9: Finalize Forecast and Purchase Recommendations**. If organizers override the forecast, **T10: Log Organizer Override** records the override. After each run, the workflow waits 48 hours and repeats from T1 until the event date. After the event, **T11: Log Actual Day-Of Attendance** records actual attendance so forecast accuracy can be evaluated and future predictions calibrated.
 
@@ -31,7 +31,7 @@ flowchart TD
     D0 -->|"Yes"| T2["T2: Send One-Click Confirmation Email/Text to RSVPed Participants"]
     T2 --> D1{"Confirmation Response Rate Normal?"}
     D1 -->|"Yes: Normal Response Rate"| T3["T3: Combine Confirmation Data with Historical Attendance Rate"]
-    D1 -->|"No: Unusually Low Response Rate"| T4["T4: Fall Back to Historical Base Rate"]
+    D1 -->|"No: Unusually Low Response Rate"| T4["T4: Apply Historical Base Rate"]
     T4 --> T3
     T3 --> D3{"Justified Weighting Determined?"}
     D3 -->|"Yes"| T5["T5: Compute Predicted Attendance and Confidence Range"]

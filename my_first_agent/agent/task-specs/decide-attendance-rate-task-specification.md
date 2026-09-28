@@ -30,7 +30,7 @@ On inference failure or exhausted limits: Record the unresolved status and hand 
 
 - **Input name:** Historical attendance rate
 - **What it contains:** Stored attendance rate(s) from comparable past events, including the sample size and date range the rate is drawn from.
-- **Source:** Stored CPVC past-event attendance records on the normal path; T4: Fall Back to Historical Base Rate when the confirmation response rate is unusually low
+- **Source:** Stored CPVC past-event attendance records on the normal path; T4: Apply Historical Base Rate when the confirmation response rate is unusually low
 
 ### Input 3
 
@@ -45,7 +45,7 @@ On inference failure or exhausted limits: Record the unresolved status and hand 
 - **Total task timeout:** 90 seconds for one task run, including inference requests, tool calls, retries, and waiting. A tool call or retry does not restart this clock.
 - **Maximum tool calls:** 8 calls across all tools during one task run; retries count toward this total. The 5 inference requests in the Agent Inference Configuration are counted separately but share the same 90-second budget. The subtask retry limits in Section 4 also apply.
 
-Tools may use only this event's registration, confirmation, and historical attendance records. They may not modify registration or confirmation records, contact participants, send messages, collect new personal data, finalize the attendance forecast, or make purchase decisions. Tools 1–3 are read-only. Tool 4 may write only this run's weighting record for T5.
+Tools may use only this event's registration, confirmation, and historical attendance records. They may not modify registration or confirmation records, contact participants, send messages, collect new personal data, finalize the attendance forecast, or make purchase decisions. Tools 1 through 3 are read-only. Tool 4 may write only this run's weighting record for T5.
 
 ### Tool 1
 
@@ -89,8 +89,8 @@ Tools may use only this event's registration, confirmation, and historical atten
 ### Tool 4
 
 - **Tool name:** `record_weighting_decision`
-- **Input:** The blend weighting and written justification produced by Determine Weighting and Justify, with the run ID and event ID.
-- **Output:** A saved weighting record for T5, and a write confirmation for Subtasks performed.
+- **Input:** The Result or recommendation (blend weighting) and Evidence summary (written justification) produced by Determine Weighting and Justify, with the run ID and event ID.
+- **Output:** The Result or recommendation and Evidence summary saved as this run's weighting record for T5, and a write confirmation for Subtasks performed; an unconfirmed write for Unresolved issues.
 - **Implementation Route:** Database queries; an insert-or-replace write to this run's weighting record only.
 - **Integration approach:** Direct integration.
 - **Role in this task:** Support Determine Weighting and Justify by saving the chosen weighting and justification so T5: Compute Predicted Attendance and Confidence Range can use it.
@@ -106,28 +106,28 @@ Tools may use only this event's registration, confirmation, and historical atten
 - **Subtask name:** Assess Event Context
 - **Subtask description:** Examines event date, type, and known anomalies (holidays, exam periods, competing events, platform outages) to judge whether standard historical patterns are likely to apply to this event.
 - **Subtask boundary:** Read-only; may not alter event records. Produces a finding (e.g., "typical event" or "atypical: exam week") used by later subtasks.
-- **Retry limits:** 1
+- **Retry limits:** Perform once with the current evidence. Repeat once only after new material evidence, such as a successful tool retry that supplies previously missing data.
 
 ### Permitted Subtask 2
 
 - **Subtask name:** Compare to Historical Patterns
 - **Subtask description:** Examines the timing and shape of the current confirmation response curve against historical response curves for comparable events to judge whether the current response pattern is normal, slow, or anomalous.
 - **Subtask boundary:** Read-only; may not alter confirmation or historical records. Produces a finding describing how the current pattern compares to history.
-- **Retry limits:** 1
+- **Retry limits:** Perform once with the current evidence. Repeat once only after new material evidence, such as a successful tool retry that supplies previously missing data.
 
 ### Permitted Subtask 3
 
 - **Subtask name:** Determine Weighting and Justify
 - **Subtask description:** Synthesizes the findings from Assess Event Context and Compare to Historical Patterns to select a custom weighting between confirmation data and historical rate, and produces a written justification explaining the choice.
 - **Subtask boundary:** May only set the blend weighting and justification text; may not finalize the attendance forecast or alter source data. Requires that at least one of the two prior subtasks has produced a usable finding.
-- **Retry limits:** 1
+- **Retry limits:** Perform once with the current evidence. Repeat once only after new material evidence, such as a successful tool retry that supplies previously missing data.
 
 - **Decision guidance:** After each subtask, use its findings to select the permitted subtask most likely to resolve the most important remaining uncertainty. Do not follow a fixed sequence. If no permitted subtask can make useful progress, stop and hand the case to a person.
 
 ## 5. When to Stop or Hand Off to a Human
 
 - **Stop successfully when:** A blend weighting between confirmation data and historical rate has been determined and is supported by a written justification that references specific evidence (event context, response pattern comparison, or both).
-- **Hand off early when:** Event context or historical attendance data cannot be retrieved, the confirmation and historical signals conflict in a way the agent cannot resolve, or no permitted subtask can make further progress toward a justified weighting.
+- **Hand off early when:** Confirmation response data or historical attendance data cannot be retrieved, event context cannot be retrieved and Compare to Historical Patterns has not produced a usable finding, the confirmation and historical signals conflict in a way the agent cannot resolve, or no permitted subtask can make further progress toward a justified weighting.
 - **Hand off to:** CPVC Event Planner
 
 Stop at the first applicable budget limit or handoff condition. While awaiting review, take no further autonomous action.
