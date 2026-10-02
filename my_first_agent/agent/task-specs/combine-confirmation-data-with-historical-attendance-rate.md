@@ -24,13 +24,13 @@ On inference failure or exhausted limits: Record the unresolved status and hand 
 
 - **Input name:** Confirmation response data
 - **What it contains:** Current RSVP confirmation counts and response timestamps for this event (number confirmed, number pending, response rate, timing of responses relative to send time).
-- **Source:** T2: Send One-Click Confirmation Email/Text to RSVPed Participants (T2 records the responses it collects)
+- **Source:** T2: Send One-Click Confirmation Email to RSVPed Participants (T2 records the responses it collects in the Confirmation Log tab)
 
 ### Input 2
 
 - **Input name:** Historical attendance rate
 - **What it contains:** Stored attendance rate(s) from comparable past events, including the sample size and date range the rate is drawn from.
-- **Source:** Stored CPVC past-event attendance records on the normal path; T4: Apply Historical Base Rate when the confirmation response rate is unusually low
+- **Source:** Event History tab of the RSVP Sentinel workbook (stored CPVC past-event attendance records, updated by T11) on the normal path; T4: Apply Historical Base Rate when the confirmation response rate is unusually low
 
 ### Input 3
 
@@ -52,12 +52,12 @@ Tools may use only this event's registration, confirmation, and historical atten
 - **Tool name:** `retrieve_confirmation_data`
 - **Input:** Confirmation response data
 - **Output:** Confirmation counts, response rate, and response timing for the Evidence summary; missing or incomplete confirmation data for Unresolved issues.
-- **Implementation Route:** Database queries; read-only access to this event's confirmation response records.
+- **Implementation Route:** Web API calls; read-only Google Sheets API access to this event's rows in the Confirmation Log tab.
 - **Integration approach:** Direct integration.
 - **Role in this task:** Support Compare to Historical Patterns by supplying the current confirmation response curve.
 - **Task timeout:** Subject to the 90-second total task timeout. Each call may take at most 10 seconds or the remaining task time, whichever is shorter.
 - **Maximum retries:** 1 additional attempt per invocation, subject to the task-wide call and time limits.
-- **Retry only when:** A temporary database connection or read error prevents completion. Wait 2 seconds and retry only if enough time and call budget remain. Do not retry denied access, an invalid event reference, or confirmed missing records. This tool is read-only, so retries cannot create duplicate records or messages.
+- **Retry only when:** A temporary Google Sheets API connection or read error prevents completion. Wait 2 seconds and retry only if enough time and call budget remain. Do not retry denied access, an invalid event reference, or confirmed missing records. This tool is read-only, so retries cannot create duplicate records or messages.
 - **On timeout, exhausted retries, or an error that cannot be retried:** Record the attempted query, failure category, and number of attempts in Subtasks performed and Unresolved issues. Set Status to "Escalated to human," set Result or recommendation to "undetermined," and hand the case to the CPVC Event Planner with a Handoff note naming the missing confirmation data. Do not treat unreadable confirmation data as a low response rate.
 
 ### Tool 2
@@ -65,12 +65,12 @@ Tools may use only this event's registration, confirmation, and historical atten
 - **Tool name:** `retrieve_historical_rates`
 - **Input:** Historical attendance rate
 - **Output:** Past-event attendance rates, response curves, sample sizes, and date ranges for the Evidence summary; stale, sparse, or missing history for Unresolved issues.
-- **Implementation Route:** Database queries; read-only access to stored CPVC past-event attendance records, or the fallback rate supplied by T4.
+- **Implementation Route:** Web API calls; read-only Google Sheets API access to the Event History tab, or the fallback rate supplied by T4.
 - **Integration approach:** Direct integration.
 - **Role in this task:** Support Compare to Historical Patterns and Determine Weighting and Justify by supplying the historical baseline and comparable response curves.
 - **Task timeout:** Subject to the 90-second total task timeout. Each call may take at most 10 seconds or the remaining task time, whichever is shorter.
 - **Maximum retries:** 1 additional attempt per invocation, subject to the task-wide call and time limits.
-- **Retry only when:** A temporary database connection or read error prevents completion. Wait 2 seconds and retry only if enough time and call budget remain. Do not retry denied access or a confirmed absence of comparable past events. This tool is read-only, so retries cannot create duplicate records or messages.
+- **Retry only when:** A temporary Google Sheets API connection or read error prevents completion. Wait 2 seconds and retry only if enough time and call budget remain. Do not retry denied access or a confirmed absence of comparable past events. This tool is read-only, so retries cannot create duplicate records or messages.
 - **On timeout, exhausted retries, or an error that cannot be retried:** Record the attempted query, failure category, and number of attempts in Subtasks performed and Unresolved issues. Set Status to "Escalated to human," set Result or recommendation to "undetermined," and hand the case to the CPVC Event Planner with a Handoff note naming the missing historical data. Do not substitute an assumed rate for unreadable history.
 
 ### Tool 3
@@ -78,12 +78,12 @@ Tools may use only this event's registration, confirmation, and historical atten
 - **Tool name:** `retrieve_event_context`
 - **Input:** Event context metadata
 - **Output:** Event date, event type, and known anomalies (holidays, exam periods, competing campus events) for the Evidence summary; unknown or conflicting context for Unresolved issues.
-- **Implementation Route:** File operations; read-only access to the event record and CPVC event calendar supplied by T1.
+- **Implementation Route:** Web API calls; read-only Google Sheets API access to the Event Details tab supplied by T1.
 - **Integration approach:** Direct integration.
 - **Role in this task:** Support Assess Event Context by supplying the facts used to judge whether historical patterns are likely to apply.
 - **Task timeout:** Subject to the 90-second total task timeout. Each call may take at most 10 seconds or the remaining task time, whichever is shorter.
 - **Maximum retries:** 1 additional attempt per invocation, subject to the task-wide call and time limits.
-- **Retry only when:** A temporary file read error prevents completion. Wait 2 seconds and retry only if enough time and call budget remain. Do not retry denied access or a missing event record. This tool is read-only, so retries cannot create duplicate records or messages.
+- **Retry only when:** A temporary Google Sheets API read error prevents completion. Wait 2 seconds and retry only if enough time and call budget remain. Do not retry denied access or a missing event record. This tool is read-only, so retries cannot create duplicate records or messages.
 - **On timeout, exhausted retries, or an error that cannot be retried:** Record the attempted read, failure category, and number of attempts in Subtasks performed and Unresolved issues. If Compare to Historical Patterns has produced a usable finding, continue without the event context and list it as unresolved; otherwise set Status to "Escalated to human," set Result or recommendation to "undetermined," and hand the case to the CPVC Event Planner. Do not treat missing context as a "typical event" finding.
 
 ### Tool 4
@@ -91,12 +91,12 @@ Tools may use only this event's registration, confirmation, and historical atten
 - **Tool name:** `record_weighting_decision`
 - **Input:** The Result or recommendation (blend weighting) and Evidence summary (written justification) produced by Determine Weighting and Justify, with the run ID and event ID.
 - **Output:** The Result or recommendation and Evidence summary saved as this run's weighting record for T5, and a write confirmation for Subtasks performed; an unconfirmed write for Unresolved issues.
-- **Implementation Route:** Database queries; an insert-or-replace write to this run's weighting record only.
+- **Implementation Route:** Web API calls; a Google Sheets API insert-or-replace write to this run's row in the Weighting Decisions tab only.
 - **Integration approach:** Direct integration.
 - **Role in this task:** Support Determine Weighting and Justify by saving the chosen weighting and justification so T5: Compute Predicted Attendance and Confidence Range can use it.
 - **Task timeout:** Subject to the 90-second total task timeout. Each call may take at most 10 seconds or the remaining task time, whichever is shorter.
 - **Maximum retries:** 1 additional attempt, subject to the task-wide call and time limits.
-- **Retry only when:** The write fails with a temporary database error. Before retrying, wait 2 seconds and read back the record for this run ID. If the record already matches, treat the write as complete and do not retry. The run ID is the record key, so a retry replaces this run's record instead of creating a duplicate. If the read-back cannot confirm whether the first write succeeded, do not retry; hand off.
+- **Retry only when:** The write fails with a temporary Google Sheets API error. Before retrying, wait 2 seconds and read back the record for this run ID. If the record already matches, treat the write as complete and do not retry. The run ID is the record key, so a retry replaces this run's record instead of creating a duplicate. If the read-back cannot confirm whether the first write succeeded, do not retry; hand off.
 - **On timeout, exhausted retries, or an error that cannot be retried:** Record the attempted write, failure category, number of attempts, and whether the read-back confirmed anything in Subtasks performed and Unresolved issues. Set Status to "Escalated to human," keep the determined weighting and justification in the deliverable, and hand the case to the CPVC Event Planner with a Handoff note saying the weighting was not confirmed as saved. Do not signal T5 that a weighting is available until the write is confirmed.
 
 ## 4. How the Agent Should Reason
@@ -140,4 +140,4 @@ Stop at the first applicable budget limit or handoff condition. While awaiting r
 - **Subtasks performed:** Permitted subtasks completed, including repeated attempts.
 - **Unresolved issues:** Remaining uncertainties or questions; use none only if no unresolved issue remains.
 - **Handoff note:** Reason for stopping, unresolved questions, and what the reviewer needs to decide; write "Not applicable" for a completed task.
-- **Next task or recipient:** Compute Predicted Attendance and Confidence Range (T5). Unresolved cases go to the CPVC Event Planner.
+- **Next task or recipient:** Compute Predicted Attendance and Confidence Range (T5). Unresolved cases go to the CPVC Event Planner through H2: Set Weighting Manually.
