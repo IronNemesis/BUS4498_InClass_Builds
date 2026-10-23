@@ -8,6 +8,7 @@
 - Clean posts are **published** right away. Posts with missing details, rule problems, or a photo **wait** for a moderator. Posts that aren't events are **not posted**. A second post with the same date, start time, and place is refused as **already posted**.
 - The list shows upcoming published events, soonest first, with a **🍕 Free food** filter.
 - **Moderator sign-in** (bottom of the page): a moderator sees waiting posts with the reasons and the original text, and can **Approve** or **Reject** them.
+- **Nightly clean-up:** every day at about 3 a.m. Pacific, a scheduled job (`archive-past-events`) archives published and waiting posts whose date has passed. See it in Supabase under **Integrations → Cron**.
 
 ## 2. Where things live
 
@@ -16,7 +17,7 @@
 - **Files that matter:**
   - `index.html`, `app.js`, `style.css`, `config.js`: the website. `config.js` holds only the Project URL and the publishable key, which are public.
   - `supabase/functions/submit-event/index.ts`: the AI agent (an Edge Function, deployed with JWT verification off).
-  - `supabase/migrations/`: the database changes, one file per stage (the `events` table, flyer photos, moderator sign-in).
+  - `supabase/migrations/`: the database changes, one file per stage (the `events` table, flyer photos, moderator sign-in, nightly clean-up).
   - `context/posting-rules.md` and `context/campus-places.md`: the rules and place list. They are also copied into the agent's `index.ts`, so change both together.
   - `test/sample-announcements.md`: test posts and what should happen.
   - `AGENTS.md`: instructions for Claude Code or Codex. Ask your assistant to read it first.
@@ -39,7 +40,6 @@ Paste these into the website's form (full texts are in `test/sample-announcement
 
 ## 5. What’s next
 
-- Past events stay `published` in the database; the website just hides them. The optional **nightly clean-up** stage in `AGENTS.md` would archive them automatically.
 - Moderators can approve or reject but can't fix a typo on a card; the club has to post again.
 - A rejected flyer post's photo stays in the `flyers` storage bucket.
 - The agent works with Claude only; an `OPENAI_API_KEY` path isn't built.
