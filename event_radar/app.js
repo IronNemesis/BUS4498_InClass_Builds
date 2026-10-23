@@ -23,7 +23,7 @@
   const postButton = document.getElementById("post-button");
   const resultBox = document.getElementById("result");
   const refreshButton = document.getElementById("refresh");
-  const chips = document.querySelectorAll(".chip[data-filter]");
+  const foodOnlyButton = document.getElementById("food-only");
   const signInForm = document.getElementById("sign-in-form");
   const signInButton = document.getElementById("sign-in-button");
   const signInResult = document.getElementById("sign-in-result");
@@ -34,7 +34,7 @@
   const waitingList = document.getElementById("waiting");
 
   let events = [];
-  let filter = "all";
+  let foodOnly = false;
 
   // ---------- small helpers ----------
 
@@ -131,9 +131,9 @@
   }
 
   function renderBoard() {
-    const shown = filter === "food" ? events.filter((e) => e.free_food) : events;
+    const shown = foodOnly ? events.filter((e) => e.free_food) : events;
     if (shown.length === 0) {
-      showMessage(filter === "food" ? "No free-food events right now." : "No events yet. Post the first one!");
+      showMessage(foodOnly ?"No free-food events right now." : "No events yet. Post the first one!");
       return;
     }
     board.replaceChildren(...shown.map(eventCard));
@@ -367,12 +367,10 @@
 
   refreshButton.addEventListener("click", loadEvents);
 
-  chips.forEach((chip) => {
-    chip.addEventListener("click", () => {
-      filter = chip.dataset.filter;
-      chips.forEach((c) => c.setAttribute("aria-pressed", String(c === chip)));
-      renderBoard();
-    });
+  foodOnlyButton.addEventListener("click", () => {
+    foodOnly = !foodOnly;
+    foodOnlyButton.setAttribute("aria-pressed", String(foodOnly));
+    renderBoard();
   });
 
   loadEvents();
