@@ -53,6 +53,28 @@
       <ul class="board" id="board" aria-live="polite">
         <li class="empty">Loading events…</li>
       </ul>
+
+      <details class="card mod" id="mod">
+        <summary>Moderator sign-in</summary>
+        <div id="mod-signed-out">
+          <form id="sign-in-form">
+            <label for="mod-email">Email</label>
+            <input type="email" id="mod-email" name="email" autocomplete="username" required>
+            <label for="mod-password">Password</label>
+            <input type="password" id="mod-password" name="password" autocomplete="current-password" required>
+            <button type="submit" id="sign-in-button">Sign in</button>
+          </form>
+          <div id="sign-in-result" hidden aria-live="polite"></div>
+        </div>
+        <div id="mod-signed-in" hidden>
+          <div class="board-head">
+            <p class="muted">Signed in as <strong id="mod-who"></strong></p>
+            <button type="button" class="ghost" id="sign-out">Sign out</button>
+          </div>
+          <h3>Waiting for review</h3>
+          <ul class="board preview" id="waiting" aria-live="polite"></ul>
+        </div>
+      </details>
     </section>
   </main>
 

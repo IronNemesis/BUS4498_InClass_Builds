@@ -24,6 +24,14 @@
   const resultBox = document.getElementById("result");
   const refreshButton = document.getElementById("refresh");
   const chips = document.querySelectorAll(".chip[data-filter]");
+  const signInForm = document.getElementById("sign-in-form");
+  const signInButton = document.getElementById("sign-in-button");
+  const signInResult = document.getElementById("sign-in-result");
+  const signedOutView = document.getElementById("mod-signed-out");
+  const signedInView = document.getElementById("mod-signed-in");
+  const modWho = document.getElementById("mod-who");
+  const signOutButton = document.getElementById("sign-out");
+  const waitingList = document.getElementById("waiting");
 
   let events = [];
   let filter = "all";
@@ -135,9 +143,8 @@
 
   let db = null;
   if (window.supabase && config.supabaseUrl && config.publishableKey) {
-    db = window.supabase.createClient(config.supabaseUrl, config.publishableKey, {
-      auth: { persistSession: false },
-    });
+    // The moderator's sign-in is remembered in this browser until they sign out.
+    db = window.supabase.createClient(config.supabaseUrl, config.publishableKey);
   }
 
   async function loadEvents() {
@@ -239,6 +246,122 @@
       postButton.textContent = "Post event";
     }
   });
+
+  // ---------- moderators ----------
+  // Signed in, a moderator can read every post and change only its status (see the Stage 8 migration).
+
+  const REVIEW_COLUMNS = `${PUBLIC_COLUMNS}, status_reason, announcement, note_for_moderator`;
+
+  function showSignInError(text) {
+    const box = el("div", "result error");
+    box.append(el("p", "result-label", "Couldn’t sign in"), el("p", null, text));
+    signInResult.replaceChildren(box);
+    signInResult.hidden = false;
+  }
+
+  async function decide(id, status, buttons, review) {
+    buttons.forEach((button) => { button.disabled = true; });
+    try {
+      const { data: userData } = await db.auth.getUser();
+      const { data, error } = await db
+        .from("events")
+        .update({
+          status,
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: userData?.user?.email || "",
+        })
+        .eq("id", id)
+        .select("id");
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error("No post was changed.");
+      await Promise.all([loadWaiting(), loadEvents()]);
+    } catch (err) {
+      console.error("Couldn't save the decision:", err);
+      buttons.forEach((button) => { button.disabled = false; });
+      review.append(el("p", "why", "Couldn’t save that. Please try again."));
+    }
+  }
+
+  function reviewCard(post) {
+    const li = eventCard(post);
+    const review = el("div", "review");
+    review.append(el("p", "why", post.status_reason || "Waiting for a moderator."));
+    if (post.note_for_moderator) review.append(el("p", "why", `Note: ${post.note_for_moderator}`));
+    review.append(el("p", "original", post.announcement));
+
+    const actions = el("p", "actions");
+    const approve = el("button", null, "Approve");
+    const reject = el("button", "ghost", "Reject");
+    approve.type = "button";
+    reject.type = "button";
+    approve.addEventListener("click", () => decide(post.id, "published", [approve, reject], review));
+    reject.addEventListener("click", () => decide(post.id, "rejected", [approve, reject], review));
+    actions.append(approve, reject);
+    review.append(actions);
+
+    li.querySelector(".event-body").append(review);
+    return li;
+  }
+
+  async function loadWaiting() {
+    const { data, error } = await db
+      .from("events")
+      .select(REVIEW_COLUMNS)
+      .eq("status", "waiting")
+      .order("created_at", { ascending: true });
+    if (error) {
+      console.error("Couldn't load waiting posts:", error);
+      waitingList.replaceChildren(el("li", "empty", "Couldn’t load waiting posts. Try signing in again."));
+      return;
+    }
+    if (!data || data.length === 0) {
+      waitingList.replaceChildren(el("li", "empty", "Nothing is waiting for review."));
+      return;
+    }
+    waitingList.replaceChildren(...data.map(reviewCard));
+  }
+
+  function showModerator(session) {
+    const signedIn = Boolean(session && session.user);
+    signedOutView.hidden = signedIn;
+    signedInView.hidden = !signedIn;
+    if (signedIn) {
+      modWho.textContent = session.user.email || "moderator";
+      loadWaiting();
+    } else {
+      waitingList.replaceChildren();
+    }
+  }
+
+  if (db) {
+    // Runs on page load (with any remembered sign-in) and whenever someone signs in or out.
+    // setTimeout lets the sign-in finish before the page asks the database for more.
+    db.auth.onAuthStateChange((_event, session) => {
+      setTimeout(() => showModerator(session), 0);
+    });
+
+    signInForm.addEventListener("submit", async (submitEvent) => {
+      submitEvent.preventDefault();
+      signInButton.disabled = true;
+      signInResult.hidden = true;
+      const { error } = await db.auth.signInWithPassword({
+        email: signInForm.email.value.trim(),
+        password: signInForm.password.value,
+      });
+      signInButton.disabled = false;
+      if (error) {
+        showSignInError("Check your email and password and try again.");
+        return;
+      }
+      signInForm.reset();
+    });
+
+    signOutButton.addEventListener("click", async () => {
+      signOutButton.disabled = true;
+      await db.auth.signOut();
+      signOutButton.disabled = false;
+    });
+  }
 
   // ---------- list controls ----------
 
