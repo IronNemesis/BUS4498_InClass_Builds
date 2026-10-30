@@ -32,6 +32,11 @@
   const modWho = document.getElementById("mod-who");
   const signOutButton = document.getElementById("sign-out");
   const waitingList = document.getElementById("waiting");
+  const lessonForm = document.getElementById("lesson-form");
+  const lessonInput = document.getElementById("lesson");
+  const lessonButton = document.getElementById("lesson-button");
+  const lessonResult = document.getElementById("lesson-result");
+  const lessonList = document.getElementById("lessons");
 
   let events = [];
   let foodOnly = false;
@@ -250,7 +255,24 @@
   // ---------- moderators ----------
   // Signed in, a moderator can read every post and change only its status (see the Stage 8 migration).
 
-  const REVIEW_COLUMNS = `${PUBLIC_COLUMNS}, status_reason, announcement, note_for_moderator`;
+  const REVIEW_COLUMNS = `${PUBLIC_COLUMNS}, status_reason, announcement, note_for_moderator, looked_at`;
+
+  // Stage 13: "The agent looked at: posting rules, campus places, 5 clubs, 2 recent messages, …"
+  function lookedAtText(lookedAt) {
+    if (!Array.isArray(lookedAt) || lookedAt.length === 0) return "";
+    const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+    const bits = lookedAt.map((item) => {
+      const count = typeof item.count === "number" ? item.count : Array.isArray(item.ids) ? item.ids.length : null;
+      switch (item.source) {
+        case "club list": return plural(count, "club");
+        case "recent messages": return plural(count, "recent message");
+        case "earlier posts": return plural(count, "earlier post");
+        case "lessons": return plural(count, "lesson");
+        default: return String(item.source || "");
+      }
+    }).filter(Boolean);
+    return `The agent looked at: ${bits.join(", ")}.`;
+  }
 
   function showSignInError(text) {
     const box = el("div", "result error");
@@ -288,6 +310,8 @@
     review.append(el("p", "why", post.status_reason || "Waiting for a moderator."));
     if (post.note_for_moderator) review.append(el("p", "why", `Note: ${post.note_for_moderator}`));
     review.append(el("p", "original", post.announcement));
+    const looked = lookedAtText(post.looked_at);
+    if (looked) review.append(el("p", "original", looked));
 
     const actions = el("p", "actions");
     const approve = el("button", null, "Approve");
@@ -321,6 +345,78 @@
     waitingList.replaceChildren(...data.map(reviewCard));
   }
 
+  // ---------- lessons for the agent (Stage 13) ----------
+  // Moderators add one-sentence lessons; the agent loads the active ones before every decision.
+
+  function showLessonResult(kind, text) {
+    const box = el("div", `result ${kind}`);
+    box.append(el("p", "result-label", kind === "error" ? "Couldn’t save the lesson" : "Lesson saved"), el("p", null, text));
+    lessonResult.replaceChildren(box);
+    lessonResult.hidden = false;
+  }
+
+  async function turnOffLesson(id, button) {
+    button.disabled = true;
+    const { data, error } = await db.from("lessons").update({ active: false }).eq("id", id).select("id");
+    if (error || !data || data.length === 0) {
+      console.error("Couldn't turn off the lesson:", error);
+      button.disabled = false;
+      showLessonResult("error", "Couldn’t turn that lesson off. Please try again.");
+      return;
+    }
+    loadLessons();
+  }
+
+  async function loadLessons() {
+    const { data, error } = await db
+      .from("lessons")
+      .select("id, created_at, lesson, written_by")
+      .eq("active", true)
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.error("Couldn't load lessons:", error);
+      lessonList.replaceChildren(el("li", "empty", "Couldn’t load lessons. Try signing in again."));
+      return;
+    }
+    if (!data || data.length === 0) {
+      lessonList.replaceChildren(el("li", "empty", "No lessons yet."));
+      return;
+    }
+    lessonList.replaceChildren(...data.map((lesson) => {
+      const li = el("li", "lesson");
+      const text = el("div");
+      text.append(el("p", null, lesson.lesson));
+      if (lesson.written_by) text.append(el("p", "muted", lesson.written_by));
+      const off = el("button", "ghost", "Turn off");
+      off.type = "button";
+      off.addEventListener("click", () => turnOffLesson(lesson.id, off));
+      li.append(text, off);
+      return li;
+    }));
+  }
+
+  lessonForm.addEventListener("submit", async (submitEvent) => {
+    submitEvent.preventDefault();
+    const lesson = lessonInput.value.trim();
+    if (!lesson || !db) return;
+    lessonButton.disabled = true;
+    lessonResult.hidden = true;
+    const { data: userData } = await db.auth.getUser();
+    const { error } = await db.from("lessons").insert({
+      lesson,
+      written_by: userData?.user?.email || "",
+    });
+    lessonButton.disabled = false;
+    if (error) {
+      console.error("Couldn't save the lesson:", error);
+      showLessonResult("error", "Please try again. Keep it to one sentence of 200 characters or fewer.");
+      return;
+    }
+    lessonForm.reset();
+    showLessonResult("published", "The agent will read it before every decision.");
+    loadLessons();
+  });
+
   function showModerator(session) {
     const signedIn = Boolean(session && session.user);
     signedOutView.hidden = signedIn;
@@ -328,8 +424,11 @@
     if (signedIn) {
       modWho.textContent = session.user.email || "moderator";
       loadWaiting();
+      loadLessons();
     } else {
       waitingList.replaceChildren();
+      lessonList.replaceChildren();
+      lessonResult.hidden = true;
     }
   }
 

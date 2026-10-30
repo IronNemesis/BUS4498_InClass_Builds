@@ -72,6 +72,19 @@
           </div>
           <h3>Waiting for review</h3>
           <ul class="board preview" id="waiting" aria-live="polite"></ul>
+
+          <h3>Lessons for the agent</h3>
+          <form id="lesson-form">
+            <label for="lesson">
+              New lesson
+              <span class="hint">One sentence the agent reads before every decision. Up to 200 characters.</span>
+            </label>
+            <input type="text" id="lesson" name="lesson" maxlength="200" required
+              placeholder="“The Grind” is the UU coffee shop, so it’s on campus.">
+            <button type="submit" id="lesson-button">Add lesson</button>
+          </form>
+          <div id="lesson-result" hidden aria-live="polite"></div>
+          <ul class="lessons" id="lessons" aria-live="polite"></ul>
         </div>
       </details>
     </section>
