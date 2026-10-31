@@ -19,6 +19,10 @@
 //              help complete a follow-up such as "actually 8 pm".
 //   Stage 13 - the moderators' lessons: a lesson can make a post wait, never publish or reject one.
 //
+// Stage 14: the chat-channel reader (read-channel) sends each chat message as JSON with source, source_id,
+// source_name, and thread. A message the agent already handled gets "duplicate" with already_read: true,
+// with no AI call; the unique index events_one_per_message is the backstop.
+//
 // Deployed with JWT verification off: the website sends only the publishable key.
 
 import Anthropic from "npm:@anthropic-ai/sdk@0.131.0";
@@ -281,8 +285,15 @@ function validTime(value: string): string {
 }
 
 // thread (Stage 12): the sender's earlier chat messages, oldest first, sent as JSON by the chat-channel
-// reader (Stage 14). source_name is only used to say whose messages they were.
-type Submission = { announcement: string; flyer: File | null; thread: string[]; sourceName: string };
+// reader (Stage 14), along with where the message came from (source, source_id, source_name).
+type Submission = {
+  announcement: string;
+  flyer: File | null;
+  thread: string[];
+  source: string;
+  sourceId: string;
+  sourceName: string;
+};
 
 async function readSubmission(req: Request): Promise<Submission> {
   const type = req.headers.get("content-type") ?? "";
@@ -295,6 +306,8 @@ async function readSubmission(req: Request): Promise<Submission> {
       announcement: typeof body?.announcement === "string" ? body.announcement : "",
       flyer: null,
       thread,
+      source: String(body?.source ?? "website").slice(0, 40) || "website",
+      sourceId: String(body?.source_id ?? "").slice(0, 80),
       sourceName: String(body?.source_name ?? "").slice(0, 80),
     };
   }
@@ -307,10 +320,12 @@ async function readSubmission(req: Request): Promise<Submission> {
       // An empty file field arrives as a file with no bytes: treat it as "no photo".
       flyer: flyer instanceof File && flyer.size > 0 ? flyer : null,
       thread: [],
+      source: "website",
+      sourceId: "",
       sourceName: "",
     };
   }
-  return { announcement: "", flyer: null, thread: [], sourceName: "" };
+  return { announcement: "", flyer: null, thread: [], source: "website", sourceId: "", sourceName: "" };
 }
 
 type Flyer = { bytes: Uint8Array; mediaType: "image/png" | "image/jpeg"; extension: "png" | "jpg" };
@@ -591,6 +606,27 @@ Deno.serve(async (req) => {
       return json({ ok: false, message: "The website has had a lot of posts today. Please try again tomorrow." }, 429);
     }
 
+    // Stage 14: a chat message the agent already handled gets no second decision and no AI call.
+    const source = { source: submission.source, source_id: submission.sourceId, source_name: submission.sourceName };
+    const alreadyRead = {
+      ok: true,
+      status: "duplicate",
+      already_read: true,
+      message: "This chat message was already read.",
+      reasons: [],
+      event: null,
+    };
+    if (submission.sourceId) {
+      const { data: seen, error: seenError } = await db
+        .from("events")
+        .select("id")
+        .eq("source", submission.source)
+        .eq("source_id", submission.sourceId)
+        .maybeSingle();
+      if (seenError) throw seenError;
+      if (seen) return json(alreadyRead);
+    }
+
     // Before the AI reads the post, the code looks things up for it (Stages 11 to 13).
     // notes: what the agent looked at, saved with the post (agent_notes) and shown to the poster and moderator.
     // extra: reasons added by the club list, the memory, and the lessons. They can only make a post wait.
@@ -619,7 +655,9 @@ Deno.serve(async (req) => {
         announcement,
         ai_model: CLAUDE_MODEL,
         agent_notes: notes,
+        ...source,
       }).select("id").single();
+      if (error?.code === "23505") return json(alreadyRead);
       if (error) throw error;
       const flyerUrl = flyer ? await saveFlyer(db, data.id, flyer) : "";
       return json({
@@ -798,6 +836,7 @@ Deno.serve(async (req) => {
       // A waiting update remembers which post it replaces, so approving it on the website retires the old one.
       updates_id: old && status === "waiting" ? old.id : null,
       lessons_used: used,
+      ...source,
     };
 
     const cardColumns =
@@ -835,6 +874,10 @@ Deno.serve(async (req) => {
     const { data, error } = await db.from("events").insert(row).select(cardColumns).single();
 
     if (error) {
+      // Two runs of the chat reader raced on the same message: the database kept only the first.
+      if (error.code === "23505" && String(error.message).includes("events_one_per_message")) {
+        return json(alreadyRead);
+      }
       if (error.code === "23505") {
         return json({
           ok: true,
